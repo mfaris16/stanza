@@ -111,7 +111,7 @@ def extract_bert_embeddings(model_name, tokenizer, model, data, device):
     Extract transformer embeddings using a generic roberta extraction
     data: list of list of string (the text tokens)
     """
-    if not model_name.startswith("vinai/phobert"):
+    if model_name.startswith("vinai/phobert"):
         return extract_phobert_embeddings(tokenizer, model, data, device)
 
     #add add_prefix_space = True for RoBerTa-- error if not
