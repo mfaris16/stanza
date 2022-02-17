@@ -1,27 +1,35 @@
+import enum
+import math
 import os
+import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence, pack_sequence, PackedSequence
+from stanza.models.common.data import map_to_ids, get_long_tensor, get_float_tensor
+from transformers import AutoModel, AutoTokenizer, XLMRobertaModel, XLMRobertaTokenizerFast, AutoModelForPreTraining, AutoModelForMaskedLM
 
 from stanza.models.common.packed_lstm import PackedLSTM
 from stanza.models.common.dropout import WordDropout, LockedDropout
 from stanza.models.common.char_model import CharacterModel, CharacterLanguageModel
 from stanza.models.common.crf import CRFLoss
 from stanza.models.common.vocab import PAD_ID
+from stanza.models.common.bert_embedding import extract_phobert_embeddings, extract_bert_embeddings
+logger = logging.getLogger('stanza')
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class NERTagger(nn.Module):
-    def __init__(self, args, vocab, emb_matrix=None, bert_model = None, bert_tokenizer= None):
+    def __init__(self, args, vocab, emb_matrix=None, bert_model=None, bert_tokenizer=None):
         super().__init__()
-
         self.vocab = vocab
         self.args = args
         self.unsaved_modules = []
         self.bert_model = bert_model
         self.bert_tokenizer = bert_tokenizer
 
-        def add_unsaved_module(name, module):
+        def add_unsaved_module(name, module):    
             self.unsaved_modules += [name]
             setattr(self, name, module)
 
@@ -86,15 +94,29 @@ class NERTagger(nn.Module):
             "Input embedding matrix must match size: {} x {}, found {}".format(vocab_size, dim, emb_matrix.size())
         self.word_emb.weight.data.copy_(emb_matrix)
 
-    def forward(self, word, word_mask, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx):
+    def forward(self, sentences, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx):
         
         def pack(x):
             return pack_padded_sequence(x, sentlens, batch_first=True)
         
         inputs = []
+        #extract static embeddings
+        static_words, word_mask = self.extract_static_embeddings(self.args, sentences)
+        word_mask.cuda()
+        static_words.cuda()
+
+        if self.args['bert_model']!=None:
+            #check if bert_model is vin/ai or not
+            if self.args['bert_model']=='vinai/phobert':
+                processed = self.extract_phobert_embeddings(self.tokenizer, self.model, sentences, device)
+            else:
+                processed_bert = extract_bert_embeddings(self.tokenizer, self.model, sentences, device)
+            bert_words = get_float_tensor(processed_bert, len(processed_bert))
+            assert(bert_words[0].size(0)==tags[0].size(0))
+            bert_words = bert_words.cuda()
         if self.args['word_emb_dim'] > 0:
-            word_emb = self.word_emb(word)
-            word_emb = pack(word_emb)
+            word_static_emb = self.word_emb(static_words)
+            word_emb = pack(torch.cat((word_static_emb, torch.tensor(bert_words)), 2)) if self.bert_model!= None else pack(word_static_emb)
             inputs += [word_emb]
 
         def pad(x):
@@ -139,3 +161,22 @@ class NERTagger(nn.Module):
         loss, trans = self.crit(logits, word_mask, tags)
         
         return loss, logits, trans
+
+    def extract_static_embeddings(self, args, sents):
+        processed = []
+        if args.get('lowercase', True): # handle word case
+            case = lambda x: x.lower()
+        else:
+            case = lambda x: x
+        if args.get('char_lowercase', False): # handle character case
+            char_case = lambda x: x.lower()
+        else:
+            char_case = lambda x: x
+        for idx, sent in enumerate(sents):
+            processed_sent = [self.vocab['word'].map([case(w[0]) for w in sent])]
+        
+        words = get_long_tensor(processed_sent, len(sents))
+        words_mask = torch.eq(words, PAD_ID)
+
+        return words, words_mask
+
