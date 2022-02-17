@@ -22,6 +22,7 @@ def load_tokenizer(model_name):
         bert_tokenizer = AutoTokenizer.from_pretrained(model_name, **bert_args)
         return bert_tokenizer
     return None
+    
 def load_bert(model_name):
     if model_name:
         # such as: "vinai/phobert-base"
