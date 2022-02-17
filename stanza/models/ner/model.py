@@ -43,7 +43,7 @@ class NERTagger(nn.Module):
             if not self.args.get('emb_finetune', True):
                 self.word_emb.weight.detach_()
             input_size += self.args['word_emb_dim']
-            if self.args['bert_model']!=None: 
+            if self.args.get('bert_model', False):
                 input_size += self.bert_model.config.hidden_size
 
         if self.args['char'] and self.args['char_emb_dim'] > 0:
