@@ -152,8 +152,8 @@ class NERTagger(nn.Module):
 
         lstm_inputs = PackedSequence(lstm_inputs, inputs[0].batch_sizes)
         lstm_outputs, _ = self.taggerlstm(lstm_inputs, sentlens, hx=(\
-                self.taggerlstm_h_init.expand(2 * self.args['num_layers'], word.size(0), self.args['hidden_dim']).contiguous(), \
-                self.taggerlstm_c_init.expand(2 * self.args['num_layers'], word.size(0), self.args['hidden_dim']).contiguous()))
+                self.taggerlstm_h_init.expand(2 * self.args['num_layers'], sentences.size(0), self.args['hidden_dim']).contiguous(), \
+                self.taggerlstm_c_init.expand(2 * self.args['num_layers'], sentences.size(0), self.args['hidden_dim']).contiguous()))
         lstm_outputs = lstm_outputs.data
 
 
