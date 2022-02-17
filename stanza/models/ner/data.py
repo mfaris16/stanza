@@ -56,10 +56,9 @@ class DataLoader:
                 self.tags.append([w[1] for w in sent])
                 #remove case() because it's not necceasary for bert
                 #processed_sent = [[w[0] for w in sent]]
-         
-        
-        #self.tags = [[w[1] for w in sent] for sent in data]
-        data = new_data
+            data = new_data
+        else:
+            self.tags = [[w[1] for w in sent] for sent in data]
         # handle vocab
         self.pretrain = pretrain
         if vocab is None:
