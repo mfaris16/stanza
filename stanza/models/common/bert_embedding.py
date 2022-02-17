@@ -45,7 +45,7 @@ def extract_phobert_embeddings(tokenizer, model, data, device):
     list_tokenized = [] # list of tokenized sentences from phobert
     for idx, sent in enumerate(data):
         #replace \xa0 or whatever the space character is by _ since PhoBERT expects _ between syllables
-        tokenized = [word.replace("\xa0","_") for word in sent]
+        tokenized = [word.replace("\xa0","_").replace(" ", "_") for word in sent]
 
         #concatenate to a sentence
         sentence = ' '.join(tokenized)

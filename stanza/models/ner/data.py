@@ -27,36 +27,35 @@ class DataLoader:
         self.preprocess_tags = preprocess_tags
 
         data = self.load_doc(self.doc)
-        new_data = []
+        max_len_data = []
         self.tags = []
 
         #check if bert_model is used
-        self.tokenizer = load_tokenizer(self.args['bert_model']) if self.args.get('bert_model', False) else None
+        self.bert_tokenizer = load_tokenizer(self.args['bert_model']) if self.args.get('bert_model', False) else None
         
         if self.args.get('bert_model', False):
             #eliminate all the sentences that are too long for bert model
             for sent in data:
                 #check if the max tokenized length is less than maximum (256 for vi) and replace nbs with space
-                tokenized = [word[0].replace("\xa0","_") for word in sent]
+                tokenized = [word[0].replace("\xa0","_").replace(" ", "_") for word in sent] if self.args['bert_model'].startswith("vinai/phobert") else [word[0] for word in sent]
                 #concatenate to a sentence
                 sentence = ' '.join(tokenized)
                 
                 #tokenize using AutoTokenizer BERT
-                tokenized = self.tokenizer.tokenize(sentence)
+                tokenized = self.bert_tokenizer.tokenize(sentence)
                 
                 #convert tokens to ids
-                sent_ids = self.tokenizer.convert_tokens_to_ids(tokenized)
+                sent_ids = self.bert_tokenizer.convert_tokens_to_ids(tokenized)
                 
                 #add start and end tokens to sent_ids
-                tokenized_sent = [self.tokenizer.bos_token_id] + sent_ids + [self.tokenizer.eos_token_id]
+                tokenized_sent = [self.bert_tokenizer.bos_token_id] + sent_ids + [self.bert_tokenizer.eos_token_id]
                 
-                if len(tokenized_sent) > self.tokenizer.model_max_length:
+                if len(tokenized_sent) > self.bert_tokenizer.model_max_length:
                     continue
-                new_data.append(sent)
+                max_len_data.append(sent)
                 self.tags.append([w[1] for w in sent])
-                #remove case() because it's not necceasary for bert
-                #processed_sent = [[w[0] for w in sent]]
-            data = new_data
+
+            data = max_len_data
         else:
             self.tags = [[w[1] for w in sent] for sent in data]
         # handle vocab
@@ -113,26 +112,7 @@ class DataLoader:
         else:
             char_case = lambda x: x
         for sent in data:
-            """
-            #check if the max tokenized length is less than maximum (256 for vi)
-            tokenized = [word[0].replace("\xa0","_") for word in sent]
-            #concatenate to a sentence
-            sentence = ' '.join(tokenized)
-            
-            #tokenize using AutoTokenizer PhoBERT
-            tokenized = tokenizer.tokenize(sentence)
-                        
-            #convert tokens to ids
-            sent_ids = tokenizer.convert_tokens_to_ids(tokenized)
-            
-            #add start and end tokens to sent_ids
-            tokenized_sent = [tokenizer.bos_token_id] + sent_ids + [tokenizer.eos_token_id]
-
-            if len(tokenized_sent) > tokenizer.model_max_length:
-                continue
-            """
             processed_sent = [[w[0] for w in sent]]
-            #processed_sent = [vocab['word'].map([case(w[0]) for w in sent])]
             processed_sent += [[vocab['char'].map([char_case(x) for x in w[0]]) for w in sent]]
             processed_sent += [vocab['tag'].map([w[1] for w in sent])]
             processed.append(processed_sent)
