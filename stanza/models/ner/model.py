@@ -178,7 +178,7 @@ class NERTagger(nn.Module):
         
         print(processed)
 
-        words = get_long_tensor(processed[0], len(sents))
+        words = get_long_tensor(processed, len(sents))
         words_mask = torch.eq(words, PAD_ID)
 
         return words, words_mask
