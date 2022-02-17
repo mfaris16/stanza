@@ -112,10 +112,10 @@ class NERTagger(nn.Module):
 
         if self.args.get('bert_model', False):
             #check if bert_model is vin/ai or not
-            if self.args['bert_model']=='vinai/phobert':
-                processed = self.extract_phobert_embeddings(self.tokenizer, self.model, sentences, device)
+            if self.args['bert_model']=='vinai/phobert-base':
+                processed_bert = extract_phobert_embeddings(self.bert_tokenizer, self.bert_model, sentences, device)
             else:
-                processed_bert = extract_bert_embeddings(self.tokenizer, self.model, sentences, device)
+                processed_bert = extract_bert_embeddings(self.bert_tokenizer, self.bert_model, sentences, device)
             bert_words = get_float_tensor(processed_bert, len(processed_bert))
             assert(bert_words[0].size(0)==tags[0].size(0))
             if self.use_cuda:
