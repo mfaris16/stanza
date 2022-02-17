@@ -12,12 +12,14 @@ from stanza.models.common.crf import CRFLoss
 from stanza.models.common.vocab import PAD_ID
 
 class NERTagger(nn.Module):
-    def __init__(self, args, vocab, emb_matrix=None):
+    def __init__(self, args, vocab, emb_matrix=None, bert_model = None, bert_tokenizer= None):
         super().__init__()
 
         self.vocab = vocab
         self.args = args
         self.unsaved_modules = []
+        self.bert_model = bert_model
+        self.bert_tokenizer = bert_tokenizer
 
         def add_unsaved_module(name, module):
             self.unsaved_modules += [name]
@@ -33,6 +35,8 @@ class NERTagger(nn.Module):
             if not self.args.get('emb_finetune', True):
                 self.word_emb.weight.detach_()
             input_size += self.args['word_emb_dim']
+            if self.args['bert_model']!=None: 
+                input_size += self.bert_model.config.hidden_size
 
         if self.args['char'] and self.args['char_emb_dim'] > 0:
             if self.args['charlm']:
