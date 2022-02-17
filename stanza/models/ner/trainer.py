@@ -19,16 +19,17 @@ logger = logging.getLogger('stanza')
 def unpack_batch(batch, use_cuda):
     """ Unpack a batch from the data loader. """
     if use_cuda:
-        inputs = [b.cuda() if b is not None else None for b in batch[:6]]
+        inputs = [batch[0]]
+        inputs += [b.cuda() if b is not None else None for b in batch[1:5]]
     else:
-        inputs = batch[:6]
-    orig_idx = batch[6]
-    word_orig_idx = batch[7]
-    char_orig_idx = batch[8]
-    sentlens = batch[9]
-    wordlens = batch[10]
-    charlens = batch[11]
-    charoffsets = batch[12]
+        inputs = batch[:5]
+    orig_idx = batch[5]
+    word_orig_idx = batch[6]
+    char_orig_idx = batch[7]
+    sentlens = batch[8]
+    wordlens = batch[9]
+    charlens = batch[10]
+    charoffsets = batch[11]
     return inputs, orig_idx, word_orig_idx, char_orig_idx, sentlens, wordlens, charlens, charoffsets
 
 def fix_singleton_tags(tags):
@@ -60,7 +61,8 @@ class Trainer(BaseTrainer):
             # build model from scratch
             self.args = args
             self.vocab = vocab
-            self.model = NERTagger(args, vocab, emb_matrix=pretrain.emb)
+            self.bert_model, self.bert_tokenizer = load_bert(args['bert_model'])
+            self.model = NERTagger(args, vocab, emb_matrix=pretrain.emb, bert_model = self.bert_model, bert_tokenizer = self.bert_tokenizer)
 
         if train_classifier_only:
             logger.info('Disabling gradient for non-classifier layers')
@@ -77,14 +79,14 @@ class Trainer(BaseTrainer):
 
     def update(self, batch, eval=False):
         inputs, orig_idx, word_orig_idx, char_orig_idx, sentlens, wordlens, charlens, charoffsets = unpack_batch(batch, self.use_cuda)
-        word, word_mask, wordchars, wordchars_mask, chars, tags = inputs
+        word, wordchars, wordchars_mask, chars, tags = inputs
 
         if eval:
             self.model.eval()
         else:
             self.model.train()
             self.optimizer.zero_grad()
-        loss, _, _ = self.model(word, word_mask, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx)
+        loss, _, _ = self.model(word, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx)
         loss_val = loss.data.item()
         if eval:
             return loss_val
@@ -96,11 +98,11 @@ class Trainer(BaseTrainer):
 
     def predict(self, batch, unsort=True):
         inputs, orig_idx, word_orig_idx, char_orig_idx, sentlens, wordlens, charlens, charoffsets = unpack_batch(batch, self.use_cuda)
-        word, word_mask, wordchars, wordchars_mask, chars, tags = inputs
+        word, wordchars, wordchars_mask, chars, tags = inputs
 
         self.model.eval()
         batch_size = word.size(0)
-        _, logits, trans = self.model(word, word_mask, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx)
+        _, logits, trans = self.model(word, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx)
 
         # decode
         trans = trans.data.cpu().numpy()
@@ -145,8 +147,9 @@ class Trainer(BaseTrainer):
             raise
         self.args = checkpoint['config']
         if args: self.args.update(args)
+        self.bert_model, self.bert_tokenizer = load_bert(params['config'].get('bert_model', None))
         self.vocab = MultiVocab.load_state_dict(checkpoint['vocab'])
-        self.model = NERTagger(self.args, self.vocab)
+        self.model = NERTagger(self.args, self.vocab, self.bert_model, self.bert_tokenizer)
         self.model.load_state_dict(checkpoint['model'], strict=False)
 
     def get_known_tags(self):
@@ -165,3 +168,22 @@ class Trainer(BaseTrainer):
                 tag = tag[2:]
             tags.add(tag)
         return sorted(tags)
+    
+BERT_ARGS = {
+    "vinai/phobert-base": { "use_fast": True },
+    "vinai/phobert-large": { "use_fast": True },
+}
+def load_bert(model_name):
+    if model_name:
+        from transformers import AutoModel, AutoTokenizer
+        # such as: "vinai/phobert-base"
+        bert_model = AutoModel.from_pretrained(model_name)
+        # note that use_fast is the default
+        bert_args = BERT_ARGS.get(model_name, dict())
+        if not model_name.startswith("vinai/phobert"):
+            bert_args["add_prefix_space"] = True
+        bert_tokenizer = AutoTokenizer.from_pretrained(model_name, **bert_args)
+        return bert_model, bert_tokenizer
+
+    return None, None
+
