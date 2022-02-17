@@ -101,7 +101,7 @@ class Trainer(BaseTrainer):
         word, wordchars, wordchars_mask, chars, tags = inputs
 
         self.model.eval()
-        batch_size = word.size(0)
+        #batch_size = word.size(0)
         _, logits, trans = self.model(word, wordchars, wordchars_mask, tags, word_orig_idx, sentlens, wordlens, chars, charoffsets, charlens, char_orig_idx)
 
         # decode
