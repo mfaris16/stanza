@@ -102,8 +102,10 @@ class NERTagger(nn.Module):
         inputs = []
         #extract static embeddings
         static_words, word_mask = self.extract_static_embeddings(self.args, sentences)
-        word_mask.cuda()
-        static_words.cuda()
+
+        if self.use_cude:
+            word_mask.cuda()
+            static_words.cuda()
 
         if self.args.get('bert_model', False):
             #check if bert_model is vin/ai or not
