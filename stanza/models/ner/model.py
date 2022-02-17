@@ -21,8 +21,9 @@ logger = logging.getLogger('stanza')
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class NERTagger(nn.Module):
-    def __init__(self, args, vocab, emb_matrix=None, bert_model=None, bert_tokenizer=None):
+    def __init__(self, args, vocab, emb_matrix=None, bert_model=None, bert_tokenizer=None, use_cuda=False):
         super().__init__()
+        self.use_cuda = use_cuda
         self.vocab = vocab
         self.args = args
         self.unsaved_modules = []
@@ -115,7 +116,8 @@ class NERTagger(nn.Module):
                 processed_bert = extract_bert_embeddings(self.tokenizer, self.model, sentences, device)
             bert_words = get_float_tensor(processed_bert, len(processed_bert))
             assert(bert_words[0].size(0)==tags[0].size(0))
-            bert_words = bert_words.cuda()
+            if self.use_cuda:
+                bert_words = bert_words.cuda()
         if self.args['word_emb_dim'] > 0:
             word_static_emb = self.word_emb(static_words)
             word_emb = pack(torch.cat((word_static_emb, torch.tensor(bert_words)), 2)) if self.bert_model!= None else pack(word_static_emb)
