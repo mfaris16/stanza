@@ -23,6 +23,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class NERTagger(nn.Module):
     def __init__(self, args, vocab, emb_matrix=None, bert_model=None, bert_tokenizer=None, use_cuda=False):
         super().__init__()
+
         self.use_cuda = use_cuda
         self.vocab = vocab
         self.args = args
@@ -104,7 +105,7 @@ class NERTagger(nn.Module):
         #extract static embeddings
         static_words, word_mask = self.extract_static_embeddings(self.args, sentences)
 
-        if self.use_cude:
+        if self.use_cuda:
             word_mask.cuda()
             static_words.cuda()
 
