@@ -14,26 +14,23 @@ BERT_ARGS = {
     "vinai/phobert-large": { "use_fast": True },
 }
 
+
 def load_tokenizer(model_name):
     if model_name:
+        # note that use_fast is the default
         bert_args = BERT_ARGS.get(model_name, dict())
         if not model_name.startswith("vinai/phobert"):
             bert_args["add_prefix_space"] = True
         bert_tokenizer = AutoTokenizer.from_pretrained(model_name, **bert_args)
         return bert_tokenizer
     return None
-    
+
 def load_bert(model_name):
     if model_name:
         # such as: "vinai/phobert-base"
         bert_model = AutoModel.from_pretrained(model_name)
-        # note that use_fast is the default
-        bert_args = BERT_ARGS.get(model_name, dict())
-        if not model_name.startswith("vinai/phobert"):
-            bert_args["add_prefix_space"] = True
-        bert_tokenizer = AutoTokenizer.from_pretrained(model_name, **bert_args)
+        bert_tokenizer = load_tokenizer(model_name)
         return bert_model, bert_tokenizer
-
     return None, None
 
 def extract_phobert_embeddings(tokenizer, model, data, device):
@@ -109,11 +106,14 @@ def extract_phobert_embeddings(tokenizer, model, data, device):
     # Each tensor holds the representation of a sentence extracted from phobert
     return processed
 
-def extract_bert_embeddings(self, tokenizer, model, data, device):
+def extract_bert_embeddings(model_name, tokenizer, model, data, device):
     """
     Extract transformer embeddings using a generic roberta extraction
     data: list of list of string (the text tokens)
     """
+    if not model_name.startswith("vinai/phobert"):
+        return extract_phobert_embeddings(tokenizer, model, data, device)
+
     #add add_prefix_space = True for RoBerTa-- error if not
     tokenized = tokenizer(data, padding="longest", is_split_into_words=True, return_offsets_mapping=False, return_attention_mask=False)
     list_offsets = [[None] * (len(sentence)+2) for sentence in data]
