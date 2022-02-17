@@ -174,7 +174,7 @@ class NERTagger(nn.Module):
             char_case = lambda x: x
         for idx, sent in enumerate(sents):
             processed_sent = [self.vocab['word'].map([case(w[0]) for w in sent])]
-            processed += processed_sent
+            processed.append(processed_sent)
         
         words = get_long_tensor(processed_sent, len(sents))
         words_mask = torch.eq(words, PAD_ID)
