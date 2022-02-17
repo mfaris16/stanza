@@ -74,7 +74,7 @@ class Trainer(BaseTrainer):
             self.args = args
             self.vocab = vocab
             self.bert_model, self.bert_tokenizer = load_bert(args['bert_model'])
-            self.model = NERTagger(args, vocab, emb_matrix=pretrain.emb, bert_model = self.bert_model, bert_tokenizer = self.bert_tokenizer)
+            self.model = NERTagger(args, vocab, emb_matrix=pretrain.emb, bert_model = self.bert_model, bert_tokenizer = self.bert_tokenizer, use_cuda = self.use_cuda)
 
         if train_classifier_only:
             logger.info('Disabling gradient for non-classifier layers')
@@ -161,7 +161,7 @@ class Trainer(BaseTrainer):
         if args: self.args.update(args)
         self.bert_model, self.bert_tokenizer = load_bert(params['config'].get('bert_model', None))
         self.vocab = MultiVocab.load_state_dict(checkpoint['vocab'])
-        self.model = NERTagger(self.args, self.vocab, self.bert_model, self.bert_tokenizer)
+        self.model = NERTagger(self.args, self.vocab, bert_model = self.bert_model, bert_tokenizer = self.bert_tokenizer, use_cuda = self.use_cuda)
         self.model.load_state_dict(checkpoint['model'], strict=False)
 
     def get_known_tags(self):
