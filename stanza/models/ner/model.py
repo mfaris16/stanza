@@ -18,7 +18,6 @@ from stanza.models.common.crf import CRFLoss
 from stanza.models.common.vocab import PAD_ID
 from stanza.models.common.bert_embedding import extract_phobert_embeddings, extract_bert_embeddings
 logger = logging.getLogger('stanza')
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class NERTagger(nn.Module):
     def __init__(self, args, vocab, emb_matrix=None, bert_model=None, bert_tokenizer=None, use_cuda=False):
@@ -30,6 +29,7 @@ class NERTagger(nn.Module):
         self.unsaved_modules = []
         self.bert_model = bert_model
         self.bert_tokenizer = bert_tokenizer
+        self.device = torch.device("cuda" if torch.cuda.is_available() and self.use_cuda else "cpu")
 
         def add_unsaved_module(name, module):    
             self.unsaved_modules += [name]
@@ -103,6 +103,7 @@ class NERTagger(nn.Module):
         
         inputs = []
         batch_size = len(sentences)
+
         #extract static embeddings
         static_words, word_mask = self.extract_static_embeddings(self.args, sentences)
 
@@ -111,15 +112,12 @@ class NERTagger(nn.Module):
             static_words = static_words.cuda()
 
         if self.args.get('bert_model', False):
-            #check if bert_model is vin/ai or not
-            if self.args['bert_model']=='vinai/phobert-base':
-                processed_bert = extract_phobert_embeddings(self.bert_tokenizer, self.bert_model, sentences, device)
-            else:
-                processed_bert = extract_bert_embeddings(self.bert_tokenizer, self.bert_model, sentences, device)
+            processed_bert = extract_bert_embeddings(self.args['bert_model'], self.bert_tokenizer, self.bert_model, sentences, self.device)
             bert_words = get_float_tensor(processed_bert, len(processed_bert))
             assert(bert_words[0].size(0)==tags[0].size(0))
             if self.use_cuda:
                 bert_words = bert_words.cuda()
+
         if self.args['word_emb_dim'] > 0:
             word_static_emb = self.word_emb(static_words)
             word_emb = pack(torch.cat((word_static_emb, torch.tensor(bert_words)), 2)) if self.bert_model!= None else pack(word_static_emb)
