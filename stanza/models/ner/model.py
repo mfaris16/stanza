@@ -105,7 +105,7 @@ class NERTagger(nn.Module):
         word_mask.cuda()
         static_words.cuda()
 
-        if self.args['bert_model']!=None:
+        if self.args.get('bert_model', False):
             #check if bert_model is vin/ai or not
             if self.args['bert_model']=='vinai/phobert':
                 processed = self.extract_phobert_embeddings(self.tokenizer, self.model, sentences, device)
@@ -174,6 +174,7 @@ class NERTagger(nn.Module):
             char_case = lambda x: x
         for idx, sent in enumerate(sents):
             processed_sent = [self.vocab['word'].map([case(w[0]) for w in sent])]
+            processed += processed_sent
         
         words = get_long_tensor(processed_sent, len(sents))
         words_mask = torch.eq(words, PAD_ID)
