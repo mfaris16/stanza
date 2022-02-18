@@ -120,7 +120,7 @@ class NERTagger(nn.Module):
 
         if self.args['word_emb_dim'] > 0:
             word_static_emb = self.word_emb(static_words)
-            word_emb = pack(torch.cat((word_static_emb, torch.tensor(bert_words)), 2)) if self.bert_model!= None else pack(word_static_emb)
+            word_emb = pack(torch.cat((word_static_emb, torch.tensor(bert_words)), 2)) if self.args.get('bert_model', False) else pack(word_static_emb)
             inputs += [word_emb]
 
         def pad(x):
