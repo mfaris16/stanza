@@ -37,7 +37,7 @@ class DataLoader:
             #eliminate all the sentences that are too long for bert model
             for sent in data:
                 #check if the max tokenized length is less than maximum (256 for vi) and replace nbs with space
-                tokenized = [word[0].replace("\xa0","_").replace(" ", "_") for word in sent] if self.args['bert_model'].startswith("vinai/phobert") else [word[0] for word in sent]
+                tokenized = [word[0].replace("\xa0","_").replace(" ", "_") for word in sent] if self.args['bert_model'].startswith("vinai/phobert") else [word[0].replace("\xa0"," ") for word in sent]
                 #concatenate to a sentence
                 sentence = ' '.join(tokenized)
                 
