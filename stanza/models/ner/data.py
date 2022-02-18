@@ -55,6 +55,8 @@ class DataLoader:
                 max_len_data.append(sent)
                 self.tags.append([w[1] for w in sent])
 
+
+            logger.info("Eliminated {} datapoints because their length is over maximum size of BERT model. ".format(len(data)-len(max_len_data)))
             data = max_len_data
         else:
             self.tags = [[w[1] for w in sent] for sent in data]
