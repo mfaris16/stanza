@@ -224,7 +224,7 @@ class LSTMModel(BaseModel, nn.Module):
             self.register_parameter('word_start', torch.nn.Parameter(0.2 * torch.randn(self.word_input_size, requires_grad=True)))
             self.register_parameter('word_end', torch.nn.Parameter(0.2 * torch.randn(self.word_input_size, requires_grad=True)))
             if self.sentence_boundary_vectors is SentenceBoundary.EVERYTHING:
-                self.register_parameter('transition_start', torch.nn.Parameter(0.2 * torch.randn(self.transition_hidden_size, requires_grad=True)))
+                self.register_parameter('transition_start', torch.nn.Parameter(0.2 * torch.randn(1, 1, self.transition_hidden_size, requires_grad=True)))
                 self.register_parameter('constituent_start', torch.nn.Parameter(0.2 * torch.randn(self.hidden_size, requires_grad=True)))
 
         # we set up the bert AFTER building word_start and word_end
@@ -680,7 +680,7 @@ class LSTMModel(BaseModel, nn.Module):
         The subsequent batch built this way will be used for batch_size trees
         """
         if self.sentence_boundary_vectors is SentenceBoundary.EVERYTHING:
-            transition_start = self.transition_start.unsqueeze(0).unsqueeze(0)
+            transition_start = self.transition_start
             output, (hx, cx) = self.transition_lstm(transition_start)
             transition_start = output[0, 0, :]
         else:
