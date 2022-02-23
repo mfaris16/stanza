@@ -197,6 +197,23 @@ def test_forward_constituency_composition(pt):
     model = build_model(pt, '--constituency_composition', 'bilstm_max')
     run_forward_checks(model, num_states=2)
 
+    model = build_model(pt, '--constituency_composition', 'attn')
+    run_forward_checks(model, num_states=2)
+
+def test_forward_attn_cc(pt):
+    """
+    Test different constituency composition functions
+    """
+    model = build_model(pt, '--constituency_composition', 'attn', '--reduce_dim', '129')
+    assert model.reduce_dim >= 129
+    assert model.reduce_dim % model.reduce_heads == 0
+    run_forward_checks(model, num_states=2)
+
+    model = build_model(pt, '--constituency_composition', 'attn', '--reduce_dim', '129', '--reduce_heads', '10')
+    assert model.reduce_dim == 130
+    assert model.reduce_heads == 10
+    run_forward_checks(model, num_states=2)
+
 def test_forward_partitioned_attention(pt):
     """
     Test with & without partitioned attention layers
