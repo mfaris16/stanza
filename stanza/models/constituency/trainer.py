@@ -13,6 +13,7 @@ See the `train` method for the code block which starts from
 from collections import Counter
 from collections import namedtuple
 import logging
+import math
 import random
 import re
 import os
@@ -611,7 +612,11 @@ def train_model_one_batch(epoch, model, optimizer, batch, transition_tensors, mo
         for n, p in model.named_parameters():
             if watch_regex.search(n):
                 matched = True
-                logger.info("  %s norm: %f grad: %f", n, torch.linalg.norm(p), torch.linalg.norm(p.grad))
+                norm_p = torch.linalg.norm(p).item()
+                norm_p_grad = torch.linalg.norm(p.grad).item()
+                logger.info("  %s norm: %f grad: %f", n, norm_p, norm_p_grad)
+                if math.isnan(norm_p) or math.isnan(norm_p_grad):
+                    import pdb; pdb.set_trace()
         if not matched:
             logger.info("  (none found!)")
     batch_loss = tree_loss.item()
