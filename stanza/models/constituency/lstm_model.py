@@ -80,6 +80,8 @@ class SentenceBoundary(Enum):
 # BILSTM_MAX is the same as BILSTM, but instead of using a Linear
 # to reduce the outputs of the lstm, we first take the max
 # and then use a linear to reduce the max
+# ATTN means to put an attention layer over the children nodes
+# we then take the max of the children with their attention
 #
 # Experiments show that MAX is noticeably better than the other options
 # On ja_alt, here are a few results after 200 iterations,
@@ -98,9 +100,22 @@ class SentenceBoundary(Enum):
 # max over forward & backward only over 1:-1
 #   (eg, leave out the node embedding):                      0.8969
 # same as previous, but split the reduce into 2 pieces:      0.8973
+#
+# A couple varieties of ATTN:
+# first an input linear, then attn, then an output linear
+#   the upside of this would be making the dimension of the attn
+#   independent from the rest of the model
+#   however, this caused an expansion in the magnitude of the vectors,
+#   resulting in NaN for deep enough trees
+# adding layernorm or tanh to balance this out resulted in
+#   disappointing performance
+# just an attention layer means hidden_size % reduce_heads == 0
+#   that is simple enough to enforce by slightly changing hidden_size
+#   if needed
 class ConstituencyComposition(Enum):
     BILSTM                = 1
     MAX                   = 2
+    ATTN                  = 3
     BILSTM_MAX            = 4
 
 class LSTMModel(BaseModel, nn.Module):
@@ -150,6 +165,12 @@ class LSTMModel(BaseModel, nn.Module):
         self.register_buffer('constituent_tensors', torch.tensor(range(len(self.constituent_map)), requires_grad=False))
 
         self.hidden_size = self.args['hidden_size']
+        self.constituency_composition = self.args.get("constituency_composition", ConstituencyComposition.BILSTM)
+        if self.constituency_composition == ConstituencyComposition.ATTN:
+            self.reduce_heads = self.args['reduce_heads']
+            if self.hidden_size % self.reduce_heads != 0:
+                self.hidden_size = self.hidden_size + self.reduce_heads - (self.hidden_size % self.reduce_heads)
+
         self.transition_hidden_size = self.args['transition_hidden_size']
         self.tag_embedding_dim = self.args['tag_embedding_dim']
         self.transition_embedding_dim = self.args['transition_embedding_dim']
@@ -331,7 +352,6 @@ class LSTMModel(BaseModel, nn.Module):
             nn.init.normal_(self.dummy_embedding.weight, std=0.2)
         self.register_buffer('open_node_tensors', torch.tensor(range(len(open_nodes)), requires_grad=False))
 
-        self.constituency_composition = self.args.get("constituency_composition", ConstituencyComposition.BILSTM)
         # TODO: refactor
         if (self.constituency_composition == ConstituencyComposition.BILSTM or
             self.constituency_composition == ConstituencyComposition.BILSTM_MAX):
@@ -352,6 +372,8 @@ class LSTMModel(BaseModel, nn.Module):
             # transformation to turn several constituents into one new constituent
             self.reduce_linear = nn.Linear(self.hidden_size, self.hidden_size)
             initialize_linear(self.reduce_linear, self.args['nonlinearity'], self.hidden_size)
+        elif self.constituency_composition == ConstituencyComposition.ATTN:
+            self.reduce_attn = nn.MultiheadAttention(self.hidden_size, self.reduce_heads)
         else:
             raise ValueError("Unhandled ConstituencyComposition: {}".format(self.constituency_composition))
 
@@ -776,6 +798,11 @@ class LSTMModel(BaseModel, nn.Module):
             unpacked_hx = [self.lstm_input_dropout(torch.max(torch.stack(nhx), 0).values) for nhx in node_hx]
             packed_hx = torch.stack(unpacked_hx, axis=0)
             hx = self.reduce_linear(packed_hx)
+        elif self.constituency_composition == ConstituencyComposition.ATTN:
+            unpacked_hx = [torch.stack(nhx).unsqueeze(1) for nhx in node_hx]
+            unpacked_hx = [self.reduce_attn(nhx, nhx, nhx)[0].squeeze(1) for nhx in unpacked_hx]
+            unpacked_hx = [self.lstm_input_dropout(torch.max(nhx, 0).values) for nhx in unpacked_hx]
+            hx = torch.stack(unpacked_hx, axis=0)
         else:
             raise ValueError("Unhandled ConstituencyComposition: {}".format(self.constituency_composition))
 
