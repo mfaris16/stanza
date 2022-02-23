@@ -102,6 +102,8 @@ class ConstituencyComposition(Enum):
     ATTN                  = 3
     BILSTM_MAX            = 4
 
+DEBUG = False
+
 class LSTMModel(BaseModel, nn.Module):
     def __init__(self, pretrain, forward_charlm, backward_charlm, bert_model, bert_tokenizer, transitions, constituents, tags, words, rare_words, root_labels, open_nodes, unary_limit, args):
         """
@@ -812,8 +814,20 @@ class LSTMModel(BaseModel, nn.Module):
             packed_hx = torch.stack(unpacked_hx, axis=0)
             hx = self.reduce_linear(packed_hx)
         elif self.constituency_composition == ConstituencyComposition.ATTN:
+            if DEBUG:
+                print("------------------- INPUT VALUES ----------------")
+                for nhx in node_hx:
+                    print(nhx)
             unpacked_hx = [self.reduce_norm(self.reduce_input(torch.stack(nhx).unsqueeze(1))) for nhx in node_hx]
+            if DEBUG:
+                print("------------------- REDUCED VALUES ----------------")
+                for nhx in unpacked_hx:
+                    print(nhx)
             unpacked_hx = [self.reduce_attn(nhx, nhx, nhx)[0].squeeze(1) for nhx in unpacked_hx]
+            if DEBUG:
+                print("------------------- ATTN RESULTS ----------------")
+                for nhx in unpacked_hx:
+                    print(nhx)
             unpacked_hx = [self.lstm_input_dropout(torch.max(nhx, 0).values) for nhx in unpacked_hx]
             packed_hx = torch.stack(unpacked_hx, axis=0)
             hx = self.reduce_output(packed_hx)

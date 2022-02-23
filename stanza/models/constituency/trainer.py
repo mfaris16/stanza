@@ -24,6 +24,7 @@ from torch import nn
 from stanza.models.common import pretrain
 from stanza.models.common import utils
 from stanza.models.common.char_model import CharacterLanguageModel
+from stanza.models.constituency import lstm_model
 from stanza.models.constituency import parse_transitions
 from stanza.models.constituency import parse_tree
 from stanza.models.constituency import transition_sequence
@@ -511,7 +512,7 @@ def train_model_one_epoch(epoch, trainer, transition_tensors, model_loss_functio
 
     return epoch_loss, total_correct, total_incorrect
 
-def train_model_one_batch(epoch, model, optimizer, batch, transition_tensors, model_loss_function, args):
+def train_model_one_batch(epoch, model, optimizer, train_batch, transition_tensors, model_loss_function, args):
     """
     Train the model for one batch
 
@@ -523,9 +524,9 @@ def train_model_one_batch(epoch, model, optimizer, batch, transition_tensors, mo
     """
     # now we add the state to the trees in the batch
     # the state is build as a bulk operation
-    initial_states = parse_transitions.initial_state_from_preterminals([x.preterminals for x in batch], model, [x.tree for x in batch])
+    initial_states = parse_transitions.initial_state_from_preterminals([x.preterminals for x in train_batch], model, [x.tree for x in train_batch])
     batch = [state._replace(gold_sequence=sequence)
-             for (tree, sequence, _), state in zip(batch, initial_states)]
+             for (tree, sequence, _), state in zip(train_batch, initial_states)]
 
     transitions_correct = Counter()
     transitions_incorrect = Counter()
@@ -606,17 +607,23 @@ def train_model_one_batch(epoch, model, optimizer, batch, transition_tensors, mo
     tree_loss = model_loss_function(errors, answers)
     tree_loss.backward()
     if args['watch_regex']:
+        if lstm_model.DEBUG:
+            sys.exit(1)
         matched = False
         logger.info("Watching %s", args['watch_regex'])
         watch_regex = re.compile(args['watch_regex'])
         for n, p in model.named_parameters():
+            broken = False
             if watch_regex.search(n):
                 matched = True
                 norm_p = torch.linalg.norm(p).item()
                 norm_p_grad = torch.linalg.norm(p.grad).item()
                 logger.info("  %s norm: %f grad: %f", n, norm_p, norm_p_grad)
                 if math.isnan(norm_p) or math.isnan(norm_p_grad):
-                    import pdb; pdb.set_trace()
+                    broken = True
+            if broken:
+                lstm_model.DEBUG = True
+                train_model_one_batch(epoch, model, optimizer, train_batch, transition_tensors, model_loss_function, args)
         if not matched:
             logger.info("  (none found!)")
     batch_loss = tree_loss.item()
