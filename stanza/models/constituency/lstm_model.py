@@ -340,10 +340,8 @@ class LSTMModel(BaseModel, nn.Module):
                 self.reduce_linear = nn.Linear(self.hidden_size * 2, self.hidden_size)
                 initialize_linear(self.reduce_linear, self.args['nonlinearity'], self.hidden_size * 2)
             else:
-                self.reduce_forward = nn.Linear(self.hidden_size, self.hidden_size)
-                self.reduce_backward = nn.Linear(self.hidden_size, self.hidden_size)
-                initialize_linear(self.reduce_forward, self.args['nonlinearity'], self.hidden_size)
-                initialize_linear(self.reduce_backward, self.args['nonlinearity'], self.hidden_size)
+                self.reduce_linear = nn.Linear(self.hidden_size * 2, self.hidden_size)
+                initialize_linear(self.reduce_linear, self.args['nonlinearity'], self.hidden_size)
         elif self.constituency_composition == ConstituencyComposition.MAX:
             # transformation to turn several constituents into one new constituent
             self.reduce_linear = nn.Linear(self.hidden_size, self.hidden_size)
@@ -767,7 +765,11 @@ class LSTMModel(BaseModel, nn.Module):
                 lstm_output, lstm_lengths = torch.nn.utils.rnn.pad_packed_sequence(lstm_output[0])
                 lstm_output = [lstm_output[1:length-1, x, :] for x, length in zip(range(len(lstm_lengths)), lstm_lengths)]
                 lstm_output = torch.stack([torch.max(x, 0).values for x in lstm_output], axis=0)
-                hx = self.reduce_forward(lstm_output[:, :self.hidden_size]) + self.reduce_backward(lstm_output[:, self.hidden_size:])
+                forward_hx = lstm_output[:, :self.hidden_size]
+                backward_hx = lstm_output[:, self.hidden_size:]
+                combined_hx = lstm_output
+                #hx = self.reduce_forward(forward_hx) + self.reduce_backward(backward_hx)
+                hx = 0.5 * (forward_hx + backward_hx) + self.reduce_linear(combined_hx)
         elif self.constituency_composition == ConstituencyComposition.MAX:
             unpacked_hx = [self.lstm_input_dropout(torch.max(torch.stack(nhx), 0).values) for nhx in node_hx]
             packed_hx = torch.stack(unpacked_hx, axis=0)
