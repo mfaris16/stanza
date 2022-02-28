@@ -429,7 +429,7 @@ class LSTMModel(BaseModel, nn.Module):
         #if name.find(".bias") >= 0:
         #    return True
         # ... layer_norm
-        if name.find(".norm") >= 0:
+        if name.find("reduce_norm") >= 0:
             return True
         return False
 
