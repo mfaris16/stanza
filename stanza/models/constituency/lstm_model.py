@@ -366,13 +366,14 @@ class LSTMModel(BaseModel, nn.Module):
             # to avoid that, we add a LayerNorm to hopefully smooth out
             # the inputs to the attn
             self.reduce_input = nn.Linear(self.hidden_size, self.reduce_dim)
-            self.reduce_norm = nn.LayerNorm(self.reduce_dim)
+            #self.reduce_norm = nn.LayerNorm(self.reduce_dim)
             self.reduce_attn = nn.MultiheadAttention(self.reduce_dim, self.reduce_heads)
             self.reduce_output = nn.Linear(self.reduce_dim, self.hidden_size)
         else:
             raise ValueError("Unhandled ConstituencyComposition: {}".format(self.constituency_composition))
 
         self.nonlinearity = build_nonlinearity(self.args['nonlinearity'])
+        self.tanh = nn.Tanh()
 
         self.word_dropout = nn.Dropout(self.args['word_dropout'])
         self.predict_dropout = nn.Dropout(self.args['predict_dropout'])
@@ -818,7 +819,7 @@ class LSTMModel(BaseModel, nn.Module):
                 print("------------------- INPUT VALUES ----------------")
                 for nhx in node_hx:
                     print(nhx)
-            unpacked_hx = [self.reduce_norm(self.reduce_input(torch.stack(nhx).unsqueeze(1))) for nhx in node_hx]
+            unpacked_hx = [self.tanh(self.reduce_input(torch.stack(nhx).unsqueeze(1))) for nhx in node_hx]
             if DEBUG:
                 print("------------------- REDUCED VALUES ----------------")
                 for nhx in unpacked_hx:
