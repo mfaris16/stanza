@@ -109,6 +109,10 @@ class SentenceBoundary(Enum):
 #   resulting in NaN for deep enough trees
 # adding layernorm or tanh to balance this out resulted in
 #   disappointing performance
+#   tanh: 0.8972
+# another alternative not tested yet: lower initialization weights
+#   and enforce that the norms of the matrices are low enough that
+#   exponential explosion up the layers of the tree doesn't happen
 # just an attention layer means hidden_size % reduce_heads == 0
 #   that is simple enough to enforce by slightly changing hidden_size
 #   if needed
@@ -799,9 +803,11 @@ class LSTMModel(BaseModel, nn.Module):
             packed_hx = torch.stack(unpacked_hx, axis=0)
             hx = self.reduce_linear(packed_hx)
         elif self.constituency_composition == ConstituencyComposition.ATTN:
+            label_hx = [self.open_node_embedding(self.open_node_tensors[self.open_node_map[label]]) for label in labels]
             unpacked_hx = [torch.stack(nhx).unsqueeze(1) for nhx in node_hx]
+            unpacked_hx = [torch.cat((lhx.unsqueeze(0).unsqueeze(0), nhx), axis=0) for lhx, nhx in zip(label_hx, unpacked_hx)]
             unpacked_hx = [self.reduce_attn(nhx, nhx, nhx)[0].squeeze(1) for nhx in unpacked_hx]
-            unpacked_hx = [self.lstm_input_dropout(torch.max(nhx, 0).values) for nhx in unpacked_hx]
+            unpacked_hx = [self.lstm_input_dropout(torch.max(nhx[1:], 0).values) for nhx in unpacked_hx]
             hx = torch.stack(unpacked_hx, axis=0)
         else:
             raise ValueError("Unhandled ConstituencyComposition: {}".format(self.constituency_composition))
